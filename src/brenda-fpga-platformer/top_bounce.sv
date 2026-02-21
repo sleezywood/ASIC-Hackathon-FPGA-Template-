@@ -286,7 +286,7 @@ module top_bounce #(parameter CORDW=10) (
 
                 // Jump
                 if (key_up && jumps > 0 && !ceil_solid) begin
-                    qs    <= (jumps == 2) ? -20 : -25;
+                    qs    <= (jumps == 2) ? -10 : -16;
                     jumps <= jumps - 1;
                 end
             end
