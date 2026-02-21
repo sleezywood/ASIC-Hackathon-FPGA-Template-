@@ -257,8 +257,15 @@ module top_bounce #(parameter CORDW=10) (
                 end
 
                 // Checkpoint
-                if (floor_end)
+                if (floor_end) begin
                     at_checkpoint <= 1;
+                    coins         <= 0;
+                    for (rr = 0; rr < MAP_ROWS; rr = rr + 1) begin
+                        for (cc = 0; cc < MAP_COLS; cc = cc + 1) begin
+                            coin_taken[rr][cc] = 1'b0;
+                        end
+                    end
+                end
 
                 // Vertical physics
                 qs <= qs + gravity;
@@ -291,12 +298,12 @@ module top_bounce #(parameter CORDW=10) (
                 end
 
                 // Horizontal + camera
-                if (key_right && (qx + Q_SIZE + 5 < H_RES)) begin
+                if (!floor_hazard && key_right && (qx + Q_SIZE + 5 < H_RES)) begin
                     if (qx >= CAM_LOCK_X && cam_x < CAM_MAX)
                         cam_x <= cam_x + 5;
                     else
                         qx <= qx + 5;
-                end else if (key_left && (qx >= 5)) begin
+                end else if (!floor_hazard && key_left && (qx >= 5)) begin
                     if (qx <= CAM_LOCK_X && cam_x > 0)
                         cam_x <= cam_x - 5;
                     else
@@ -306,9 +313,11 @@ module top_bounce #(parameter CORDW=10) (
                 // Jump
                 if (jump_pressed && jumps > 0 && !ceil_solid) begin
                     if (jumps == 2)
-                        qs <= -14;   // first jump
+                        qs <= -15;   // first jump
+                    else if (floor_solid)
+                        qs <= -55;   // second jump on ground (stronger)
                     else
-                        qs <= -10;   // second jump (weaker than first)
+                        qs <= -14;   // second jump on platform (weaker)
                     jumps <= jumps - 1;
             end
             end
