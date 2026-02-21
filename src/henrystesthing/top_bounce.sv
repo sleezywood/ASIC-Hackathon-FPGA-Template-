@@ -50,30 +50,91 @@ module top_bounce #(parameter CORDW=10) (  // coordinate width
     end
 
     // square parameters
-    localparam Q_SIZE = 20;   // size in pixels
+    localparam Q_SIZE = 32;   // size in pixels
+    // localparam yke = 0;
+    // localparam gpe = 0;
+    // localparam mass = 30;
+
+    localparam gravity = 1;
+
+    localparam tile_x = 0;
+    localparam tile_y = 0;
+
+    logic [1:0] jumps = 2;
+
+    logic signed [15:0] qs_next;
+    logic signed [15:0] qy_next;
+
     logic [CORDW-1:0] qx, qy;  // position (origin at top left)
+
     logic qdx, qdy;            // direction: 0 is right/down
     logic [CORDW-1:0] qs = 1;  // speed in pixels/frame
 
     // update square position once per frame
     always_ff @(posedge clk_pix) begin
+
+        // qx = 200;
+        // qy = 200;
         if (frame) begin
+            qs <= qs + gravity;
 
-            // move right
-            if (key_right && (qx + Q_SIZE + qs < H_RES))
-                qx <= qx + qs;
+        // Check collision at NEXT position
+            if (bmap[(qy + qs + Q_SIZE) >> 5][qx[9:5]]) begin
+                // Hit ground:
 
-            // move left
-            else if (key_left && (qx >= qs))
-                qx <= qx - qs;
+                // if we are falling and hitting ground case
+                qs <= 0;
 
-            // move down
-            if (key_down && (qy + Q_SIZE + qs < V_RES))
+                // Snap to top of tile
+                qy <= (((qy + qs + Q_SIZE) >> 5) << 5) - Q_SIZE;
+
+                //reset jumps
+                jumps <= 2;
+            end
+
+            else if (bmap[(qy - qs - Q_SIZE) >> 5][qx[9:5]] && qs < 0) begin // we are moving upward and detect a ceiling
+                qs <= 0; // speed is set to 0(stop moving ideally)
+                qy <= qy - 1; // push slightly downward to not get stuck
+
+            end
+
+            else begin
                 qy <= qy + qs;
+                // move right
+                
 
-            // move up
-            else if (key_up && (qy >= qs))
-                qy <= qy - qs;
+
+            end
+            if (key_right && (qx + Q_SIZE + qs < H_RES))
+                    qx <= qx + 5;
+
+                // move left
+            else if (key_left && (qx >= qs))
+                    qx <= qx - 5;
+
+            else if (key_up && (qy >= qs) && jumps > 0 && !(bmap[(qy - qs - Q_SIZE) >> 5][qx[9:5]])) begin 
+
+
+                qs <= qs - 10;
+                qy <= qy + qs; // trying to replicate an impulse, no ceiling detection yet
+                jumps <= jumps - 1;
+
+            end
+
+                
+            
+            // move down(replace with logic for gravity)
+            // if (key_down && (qy + Q_SIZE + qs < V_RES))
+            //     qy <= qy + qs;
+
+            // // move up
+            // else if (key_up && (qy >= qs))
+            //     qy <= qy - qs;
+
+            // else if (bmap[qy[8:5]][qx[9:5]] == 1) // check bmap using qy and qx(square position)
+
+
+                
 
         end
     end
@@ -155,4 +216,5 @@ module simple_480p (
             sy <= 0;
         end
     end
+
 endmodule
