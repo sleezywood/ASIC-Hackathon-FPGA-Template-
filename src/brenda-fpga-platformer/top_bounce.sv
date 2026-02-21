@@ -130,6 +130,8 @@ module top_bounce #(parameter CORDW=10) (
     logic [6:0]         last_coin_col;
     integer rr;
     integer cc;
+    logic key_up_d;
+    logic jump_pressed;
 
     // Blink counter for win screen
     logic [4:0]         blink_ctr;      // counts frames for blink effect
@@ -151,11 +153,26 @@ module top_bounce #(parameter CORDW=10) (
     assign player_tile = (world_col < MAP_COLS) ? bmap[qy[9:5]][world_col]   : 3'd0;
 
     logic floor_solid, floor_hazard, floor_end, ceil_solid;
+    // ── Horizontal hazard collision ───────────────────────────────────────────
+    // Check the tile at the player's left and right edges, at their centre row
+    logic [3:0] mid_row;
+    assign mid_row = (qy16 + Q_SIZE/2) >> 5;
+
+    logic [6:0] right_col, left_col;
+    assign right_col = (world_qx + Q_SIZE) >> 5;   // tile at right edge
+    assign left_col  = (world_qx > 0) ? (world_qx - 1) >> 5 : 7'd0;  // tile at left edge
+
+    logic [2:0] right_tile, left_tile;
+    assign right_tile = (right_col < MAP_COLS) ? bmap[mid_row][right_col] : 3'd0;
+    assign left_tile  = (left_col  < MAP_COLS) ? bmap[mid_row][left_col]  : 3'd0;
+
+    logic horiz_hazard;
+    assign horiz_hazard = (right_tile == 3'd2) || (left_tile == 3'd2);
+
     assign floor_solid  = (floor_tile == 3'd1);
-    assign floor_hazard = (floor_tile == 3'd2);
+    assign floor_hazard = (floor_tile == 3'd2) || horiz_hazard;;
     assign floor_end    = (floor_tile == 3'd4);
     assign ceil_solid   = (ceil_tile  == 3'd1);
-
     // =========================================================================
     // 4x5 Bitmap font — digits 0-9 + letters Y O U W N C I S !
     // Each glyph = 20 bits, 5 rows of 4 cols, MSB = top-left
@@ -214,6 +231,8 @@ module top_bounce #(parameter CORDW=10) (
         else if (frame) begin
             // Blink counter always ticks
             blink_ctr <= blink_ctr + 1;
+            key_up_d <= key_up;
+            jump_pressed <= key_up && !key_up_d;
 
             // Retry: press any key on win screen to restart
             if (at_checkpoint && (key_up || key_right || key_left)) begin
@@ -285,10 +304,13 @@ module top_bounce #(parameter CORDW=10) (
                 end
 
                 // Jump
-                if (key_up && jumps > 0 && !ceil_solid) begin
-                    qs    <= (jumps == 2) ? -10 : -16;
+                if (jump_pressed && jumps > 0 && !ceil_solid) begin
+                    if (jumps == 2)
+                        qs <= -14;   // first jump
+                    else
+                        qs <= -22;   // second jump higher
                     jumps <= jumps - 1;
-                end
+            end
             end
         end
     end
