@@ -21,7 +21,7 @@ module de1soc_wrapper (
     output [7:0]  VGA_G,
     output [7:0]  VGA_B,
     output        VGA_HS,
-    output        VGA_VS,
+    output        VGA_VS
     // output        VGA_BLANK_N,
     // output        VGA_SYNC_N,
     // output        VGA_CLK
@@ -203,7 +203,7 @@ module de1soc_wrapper (
     assign horiz_hazard = (right_tile == 3'd2) || (left_tile == 3'd2);
 
     assign floor_solid  = (floor_tile == 3'd1);
-    assign floor_hazard = (floor_tile == 3'd2) || horiz_hazard;;
+    assign floor_hazard = (floor_tile == 3'd2) || horiz_hazard;
     assign floor_end    = (floor_tile == 3'd4);
     assign ceil_solid   = (ceil_tile  == 3'd1);
     // =========================================================================
