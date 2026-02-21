@@ -259,7 +259,7 @@ module top_bounce #(parameter CORDW=10) (
                 // Checkpoint
                 if (floor_end) begin
                     at_checkpoint <= 1;
-                    coins         <= 0;
+            
                     for (rr = 0; rr < MAP_ROWS; rr = rr + 1) begin
                         for (cc = 0; cc < MAP_COLS; cc = cc + 1) begin
                             coin_taken[rr][cc] = 1'b0;
