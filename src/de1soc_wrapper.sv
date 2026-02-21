@@ -1,7 +1,9 @@
 `timescale 1ns/100ps
 
 module de1soc_wrapper (
-    input         CLOCK_50,
+
+    input  wire logic CLOCK_50,
+    input  wire logic sim_rst,
     input  [9:0]  SW,
     input  [3:0]  KEY, // ~KEY[0] to ~KEY[3], 0 = left, 1 = right 2 = up
 
@@ -14,17 +16,18 @@ module de1soc_wrapper (
     output [6:0]  HEX2,
     output [6:0]  HEX1,
     output [6:0]  HEX0,
+    
 
     output [9:0]  LEDR,
 
-    output [7:0]  VGA_R,
-    output [7:0]  VGA_G,
-    output [7:0]  VGA_B,
-    output        VGA_HS,
-    output        VGA_VS
-    // output        VGA_BLANK_N,
-    // output        VGA_SYNC_N,
-    // output        VGA_CLK
+    output logic [7:0]  VGA_R,
+    output logic [7:0]  VGA_G,
+    output logic [7:0]  VGA_B,
+    output       logic  VGA_HS,
+    output       logic  VGA_VS,
+    output      logic [9:0] sdl_sx, // CORDW = 10  orginally [CORDW-1:0]
+    output      logic [9:0] sdl_sy
+    
 );
 
 
@@ -33,6 +36,8 @@ module de1soc_wrapper (
 
     // LEDs off
     assign LEDR = 10'b0;
+
+    
 
     // HEX displays off (active-low)
     assign HEX0 = 7'b1111111;
@@ -51,10 +56,12 @@ module de1soc_wrapper (
     // assign VGA_SYNC_N  = 1'b0;
     // assign VGA_CLK     = CLOCK_50;
 
-    logic [CORDW-1:0] sx, sy;
+    logic [9:0] sx, sy;
     logic de;
+    logic hsync;
+    logic vsync;
     simple_480p display_inst (
-        .clk_pix,
+        .CLOCK_50,
         .rst_pix(sim_rst),
         .sx, .sy,
         /* verilator lint_off PINCONNECTEMPTY */
@@ -154,7 +161,7 @@ module de1soc_wrapper (
     // =========================================================================
     // Player state
     // =========================================================================
-    logic [CORDW-1:0]   qx, qy;
+    logic [9:0]   qx, qy;
     logic signed [15:0] qs;
     logic [1:0]         jumps;
     logic               at_checkpoint;
@@ -248,7 +255,7 @@ module de1soc_wrapper (
     // =========================================================================
     // Physics
     // =========================================================================
-    always_ff @(posedge clk_pix) begin
+    always_ff @(posedge CLOCK_50) begin
         if (sim_rst) begin
             qx            <= CAM_LOCK_X;
             qy            <= 10'd100;
@@ -711,7 +718,7 @@ module de1soc_wrapper (
         display_b = de ? paint_b : 4'h0;
     end
 
-    always_ff @(posedge clk_pix) begin
+    always_ff @(posedge CLOCK_50) begin
         // sdl_sx <= sx;
         // sdl_sy <= sy;
         // sdl_de <= de;
@@ -735,7 +742,7 @@ endmodule
 
 // =============================================================================
 module simple_480p (
-    input  wire logic clk_pix,
+    input  wire logic CLOCK_50,
     input  wire logic rst_pix,
     output      logic [9:0] sx,
     output      logic [9:0] sy,
@@ -758,7 +765,7 @@ module simple_480p (
         de    = (sx <= HA_END && sy <= VA_END);
     end
 
-    always_ff @(posedge clk_pix) begin
+    always_ff @(posedge CLOCK_50) begin
         if (sx == LINE) begin
             sx <= 0;
             sy <= (sy == SCREEN) ? 0 : sy + 1;
