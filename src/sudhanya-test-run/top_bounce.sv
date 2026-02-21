@@ -259,7 +259,7 @@ module top_bounce #(parameter CORDW=10) (
                 // Checkpoint
                 if (floor_end) begin
                     at_checkpoint <= 1;
-            
+                    coins         <= 0;
                     for (rr = 0; rr < MAP_ROWS; rr = rr + 1) begin
                         for (cc = 0; cc < MAP_COLS; cc = cc + 1) begin
                             coin_taken[rr][cc] = 1'b0;
@@ -537,7 +537,7 @@ module top_bounce #(parameter CORDW=10) (
                 sy>=YW_Y && sy<YW_Y+5*YW_SC) begin
                 wtx=sx-(YW_X+7*YW_CW); wty=sy-YW_Y;
                 wfc=wtx/YW_SC; wfr=wty/YW_SC;
-                if (char_bmap[YW7][19-(wfr*4+wfc)]) win_pixel=1;
+                if (wfc < 4 && wfr < 5 && char_bmap[8][19-(wfr*4+wfc)]) win_pixel=1;
             end
 
             // ── coin count digits (medium, scale CC_SC) ───────────────────
