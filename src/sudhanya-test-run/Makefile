@@ -6,7 +6,7 @@ BUILD := build
 SDL_CFLAGS := $(shell sdl2-config --cflags)
 SDL_LIBS   := $(shell sdl2-config --libs)
 
-CXXFLAGS   := -O2 -std=c++17
+CXXFLAGS   := -O3 -std=c++17 -march=native
 
 .PHONY: sim clean
 
