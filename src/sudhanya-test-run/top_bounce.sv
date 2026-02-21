@@ -127,6 +127,7 @@ module top_bounce #(parameter CORDW=10) (
     logic [1:0]         jumps;
     logic               at_checkpoint;
     logic [5:0]         coins;
+    logic [5:0]         final_coins;  // coins earned in this round (displayed on win screen)
     logic [6:0]         last_coin_col;
     integer rr;
     integer cc;
@@ -259,6 +260,7 @@ module top_bounce #(parameter CORDW=10) (
                 // Checkpoint
                 if (floor_end) begin
                     at_checkpoint <= 1;
+                    final_coins   <= coins;  // save coin count before reset
                     coins         <= 0;
                     for (rr = 0; rr < MAP_ROWS; rr = rr + 1) begin
                         for (cc = 0; cc < MAP_COLS; cc = cc + 1) begin
@@ -419,12 +421,12 @@ module top_bounce #(parameter CORDW=10) (
 
     // coin digits for win screen
     logic [3:0] win_tens, win_ones;
-    assign win_tens = (coins >= 50) ? 4'd5 :
-                      (coins >= 40) ? 4'd4 :
-                      (coins >= 30) ? 4'd3 :
-                      (coins >= 20) ? 4'd2 :
-                      (coins >= 10) ? 4'd1 : 4'd0;
-    assign win_ones = coins - win_tens * 10;
+    assign win_tens = (final_coins >= 50) ? 4'd5 :
+                      (final_coins >= 40) ? 4'd4 :
+                      (final_coins >= 30) ? 4'd3 :
+                      (final_coins >= 20) ? 4'd2 :
+                      (final_coins >= 10) ? 4'd1 : 4'd0;
+    assign win_ones = final_coins - win_tens * 10;
 
     // Helper function: is pixel (sx,sy) inside glyph at (gx,gy) with scale sc?
     // We inline this for each character in always_comb below.
