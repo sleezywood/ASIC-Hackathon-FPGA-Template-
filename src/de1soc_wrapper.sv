@@ -22,9 +22,9 @@ module de1soc_wrapper (
     output [7:0]  VGA_B,
     output        VGA_HS,
     output        VGA_VS,
-    output        VGA_BLANK_N,
-    output        VGA_SYNC_N,
-    output        VGA_CLK
+    // output        VGA_BLANK_N,
+    // output        VGA_SYNC_N,
+    // output        VGA_CLK
 );
 
 
