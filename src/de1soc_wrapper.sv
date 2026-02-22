@@ -1,74 +1,49 @@
 `timescale 1ns/100ps
-
 module de1soc_wrapper (
 
-    input  wire logic CLOCK_50,
-    input  wire logic sim_rst,
-    input  [9:0]  SW,
+    input  wire        CLOCK_50,
+    input  wire        sim_rst,
     input  [3:0]  KEY, // ~KEY[0] to ~KEY[3], 0 = left, 1 = right 2 = up
 
-    inout         PS2_CLK,
-    inout         PS2_DAT,
-
-    output [6:0]  HEX5,
-    output [6:0]  HEX4,
-    output [6:0]  HEX3,
-    output [6:0]  HEX2,
-    output [6:0]  HEX1,
-    output [6:0]  HEX0,
-    
-
-    output [9:0]  LEDR,
-
-    output logic [7:0]  VGA_R,
-    output logic [7:0]  VGA_G,
-    output logic [7:0]  VGA_B,
-    output       logic  VGA_HS,
-    output       logic  VGA_VS,
-    output      logic [9:0] sdl_sx, // CORDW = 10  orginally [CORDW-1:0]
-    output      logic [9:0] sdl_sy
-    
+    output [7:0]       VGA_R,
+    output [7:0]       VGA_G,
+    output [7:0]       VGA_B,
+    output             VGA_HS,
+    output             VGA_VS,
+    output             VGA_CLK,
+    output             VGA_BLANK_N,
+    output             VGA_SYNC_N
 );
 
+    //-----------------------------------------
+    // 1️⃣ Generate 25 MHz pixel clock
+    //-----------------------------------------
+    logic clk_pix = 0;
+
+    always_ff @(posedge CLOCK_50)
+        clk_pix <= ~clk_pix;   // divide 50 MHz → 25 MHz
 
 
-    // Default Assignments
-
-    // LEDs off
-    assign LEDR = 10'b0;
-
-    
-
-    // HEX displays off (active-low)
-    assign HEX0 = 7'b1111111;
-    assign HEX1 = 7'b1111111;
-    assign HEX2 = 7'b1111111;
-    assign HEX3 = 7'b1111111;
-
-    // // VGA outputs black / inactive
-    // assign VGA_R = 8'b0;
-    // assign VGA_G = 8'b0;
-    // assign VGA_B = 8'b0;
-
-    // assign VGA_HS      = 1'b1;
-    // assign VGA_VS      = 1'b1;
-    // assign VGA_BLANK_N = 1'b1;
-    // assign VGA_SYNC_N  = 1'b0;
-    // assign VGA_CLK     = CLOCK_50;
-
+    //-----------------------------------------
+    // 2️⃣ VGA timing signals
+    //-----------------------------------------
     logic [9:0] sx, sy;
-    logic de;
-    logic hsync;
-    logic vsync;
+    logic hsync, vsync, de;
+
     simple_480p display_inst (
-        .CLOCK_50,
+        .CLOCK_50(clk_pix),
         .rst_pix(sim_rst),
-        .sx, .sy,
-        /* verilator lint_off PINCONNECTEMPTY */
-        .hsync(), .vsync(),
-        /* verilator lint_on PINCONNECTEMPTY */
-        .de
+        .sx(sx),
+        .sy(sy),
+        .hsync(hsync),
+        .vsync(vsync),
+        .de(de)
     );
+
+
+    //-----------------------------------------
+    // 3️⃣ Your game rendering logic here
+    //-----------------------------------------
 
     localparam H_RES   = 640;
     localparam V_RES   = 480;
@@ -210,7 +185,7 @@ module de1soc_wrapper (
     assign horiz_hazard = (right_tile == 3'd2) || (left_tile == 3'd2);
 
     assign floor_solid  = (floor_tile == 3'd1);
-    assign floor_hazard = (floor_tile == 3'd2) || horiz_hazard;
+    assign floor_hazard = (floor_tile == 3'd2) || horiz_hazard;;
     assign floor_end    = (floor_tile == 3'd4);
     assign ceil_solid   = (ceil_tile  == 3'd1);
     // =========================================================================
@@ -255,7 +230,7 @@ module de1soc_wrapper (
     // =========================================================================
     // Physics
     // =========================================================================
-    always_ff @(posedge CLOCK_50) begin
+    always_ff @(posedge clk_pix) begin
         if (sim_rst) begin
             qx            <= CAM_LOCK_X;
             qy            <= 10'd100;
@@ -271,8 +246,8 @@ module de1soc_wrapper (
         else if (frame) begin
             // Blink counter always ticks
             blink_ctr <= blink_ctr + 1;
-            key_up_d <= KEY[2];
-            jump_pressed <= KEY[2] && !key_up_d;
+            key_up_d <= ~KEY[2];
+            jump_pressed <= ~KEY[2] && !key_up_d;
 
             // Retry: press any key on win screen to restart
             if (at_checkpoint && (~KEY[2] || ~KEY[1] || ~KEY[0])) begin
@@ -352,7 +327,7 @@ module de1soc_wrapper (
                 end
 
                 // Jump
-                if (~KEY[2] && jumps > 0 && !ceil_solid) begin
+                if (jump_pressed && jumps > 0 && !ceil_solid) begin
                     if (jumps == 2)
                         qs <= -15;   // first jump
                     else if (floor_solid)
@@ -488,8 +463,8 @@ module de1soc_wrapper (
         win_bg          = 0;
         win_border      = 0;
         win_gold        = 0;
-        win_pixel       = 0;
-        win_retry_pixel = 0;
+       
+        
 
         if (at_checkpoint) begin
             // Dark background overlay for the whole screen
@@ -711,73 +686,90 @@ module de1soc_wrapper (
         end
     end
 
+
+
+
     logic [3:0] display_r, display_g, display_b;
+
+    // Example: simple white screen inside visible area
     always_comb begin
-        display_r = de ? paint_r : 4'h0;
-        display_g = de ? paint_g : 4'h0;
-        display_b = de ? paint_b : 4'h0;
-    end
-
-    always_ff @(posedge CLOCK_50) begin
-        // sdl_sx <= sx;
-        // sdl_sy <= sy;
-        // sdl_de <= de;
-        // sdl_r  <= {2{display_r}};
-        // sdl_g  <= {2{display_g}};
-        // sdl_b  <= {2{display_b}};
-
-        VGA_HS <= hsync;
-        VGA_VS <= vsync;
-        VGA_R <= display_r;
-        VGA_G <= display_g;
-        VGA_B <= display_b;
+        if (de) begin
+            display_r = 4'hF;
+            display_g = 4'hF;
+            display_b = 4'hF;
+        end else begin
+            display_r = 4'h0;
+            display_g = 4'h0;
+            display_b = 4'h0;
+        end
     end
 
 
+    //-----------------------------------------
+    // 4️⃣ VGA Output Connections
+    //-----------------------------------------
 
+    // Expand 4-bit → 8-bit
+    assign VGA_R = {display_r, display_r};
+    assign VGA_G = {display_g, display_g};
+    assign VGA_B = {display_b, display_b};
+
+    assign VGA_HS = hsync;
+    assign VGA_VS = vsync;
+
+    assign VGA_CLK     = clk_pix;
+    assign VGA_BLANK_N = 1'b1;   // video enabled
+    assign VGA_SYNC_N  = 1'b0;   // no composite sync
 
 endmodule
 
-
-
-// =============================================================================
+//modified in haste using chatgpt
 module simple_480p (
-    input  wire logic CLOCK_50,
-    input  wire logic rst_pix,
-    output      logic [9:0] sx,
-    output      logic [9:0] sy,
-    output      logic hsync,
-    output      logic vsync,
-    output      logic de
+    input  wire CLOCK_50,
+    input  wire rst_pix,
+    output logic [9:0] sx,
+    output logic [9:0] sy,
+    output logic hsync,
+    output logic vsync,
+    output logic de
 );
-    parameter HA_END = 639;
-    parameter HS_STA = HA_END + 16;
-    parameter HS_END = HS_STA + 96;
-    parameter LINE   = 799;
-    parameter VA_END = 479;
-    parameter VS_STA = VA_END + 10;
-    parameter VS_END = VS_STA + 2;
-    parameter SCREEN = 524;
+    // VGA timing parameters for 640x480 @60Hz, 25 MHz pixel clock
+    localparam H_VISIBLE = 640;
+    localparam H_FRONT   = 16;
+    localparam H_SYNC    = 96;
+    localparam H_BACK    = 48;
+    localparam H_TOTAL   = H_VISIBLE + H_FRONT + H_SYNC + H_BACK;
 
-    always_comb begin
-        hsync = ~(sx >= HS_STA && sx < HS_END);
-        vsync = ~(sy >= VS_STA && sy < VS_END);
-        de    = (sx <= HA_END && sy <= VA_END);
-    end
+    localparam V_VISIBLE = 480;
+    localparam V_FRONT   = 10;
+    localparam V_SYNC    = 2;
+    localparam V_BACK    = 33;
+    localparam V_TOTAL   = V_VISIBLE + V_FRONT + V_SYNC + V_BACK;
 
-    always_ff @(posedge CLOCK_50) begin
-        if (sx == LINE) begin
-            sx <= 0;
-            sy <= (sy == SCREEN) ? 0 : sy + 1;
-        end else begin
-            sx <= sx + 1;
-        end
+    // Pixel clock (25 MHz)
+    logic clk_pix;
+    always_ff @(posedge CLOCK_50)
+        clk_pix <= ~clk_pix;  // divide 50 MHz → 25 MHz
+
+    // Counters
+    always_ff @(posedge clk_pix or posedge rst_pix) begin
         if (rst_pix) begin
             sx <= 0;
             sy <= 0;
+        end else begin
+            if (sx == H_TOTAL-1) begin
+                sx <= 0;
+                sy <= (sy == V_TOTAL-1) ? 0 : sy + 1;
+            end else
+                sx <= sx + 1;
         end
     end
-endmodule
 
-/* verilator lint_on WIDTHEXPAND */
-/* verilator lint_on WIDTHTRUNC */
+    // Horizontal & vertical sync
+    assign hsync = ~( (sx >= H_VISIBLE + H_FRONT) && (sx < H_VISIBLE + H_FRONT + H_SYNC) );
+    assign vsync = ~( (sy >= V_VISIBLE + V_FRONT) && (sy < V_VISIBLE + V_FRONT + V_SYNC) );
+
+    // Data enable
+    assign de = (sx < H_VISIBLE) && (sy < V_VISIBLE);
+
+endmodule
