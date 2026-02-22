@@ -3,6 +3,8 @@
 // Learn more at https://projectf.io/posts/racing-the-beam/
 
 #include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
 #include <SDL.h>
 #include <verilated.h>
 #include "Vtop_bounce.h"
@@ -46,8 +48,9 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
+    // Use a streaming texture for efficient pixel updates
     sdl_texture = SDL_CreateTexture(sdl_renderer, SDL_PIXELFORMAT_RGBA8888,
-        SDL_TEXTUREACCESS_TARGET, H_RES, V_RES);
+        SDL_TEXTUREACCESS_STREAMING, H_RES, V_RES);
     if (!sdl_texture) {
         printf("Texture creation failed: %s\n", SDL_GetError());
         return 1;
@@ -71,6 +74,20 @@ int main(int argc, char* argv[]) {
     top->clk_pix = 0;
     top->eval();
 
+    // parse optional render-skip and warmup arguments
+    int render_skip = 1; // update display every N frames (1 = every frame)
+    int warmup_frames = 0; // skip pixel buffer updates/present for first N frames
+    for (int i = 1; i < argc; i++) {
+        if ((strcmp(argv[i], "-r") == 0 || strcmp(argv[i], "--skip") == 0) && i+1 < argc) {
+            render_skip = atoi(argv[i+1]);
+            if (render_skip < 1) render_skip = 1;
+        }
+        if ((strcmp(argv[i], "-w") == 0 || strcmp(argv[i], "--warmup") == 0) && i+1 < argc) {
+            warmup_frames = atoi(argv[i+1]);
+            if (warmup_frames < 0) warmup_frames = 0;
+        }
+    }
+
     // initialize frame rate
     uint64_t start_ticks = SDL_GetPerformanceCounter();
     uint64_t frame_count = 0;
@@ -85,11 +102,14 @@ int main(int argc, char* argv[]) {
 
         // update pixel if not in blanking interval
         if (top->sdl_de) {
-            Pixel* p = &screenbuffer[top->sdl_sy*H_RES + top->sdl_sx];
-            p->a = 0xFF;  // transparency
-            p->b = top->sdl_b;
-            p->g = top->sdl_g;
-            p->r = top->sdl_r;
+            // During warmup we skip pixel writes to reduce startup overhead
+            if (frame_count >= (uint64_t)warmup_frames) {
+                Pixel* p = &screenbuffer[top->sdl_sy*H_RES + top->sdl_sx];
+                p->a = 0xFF;  // transparency
+                p->b = top->sdl_b;
+                p->g = top->sdl_g;
+                p->r = top->sdl_r;
+            }
         }
 
         // update texture once per frame (in blanking)
@@ -118,10 +138,15 @@ int main(int argc, char* argv[]) {
 
             if (keyb_state[SDL_SCANCODE_Q]) break;  // quit if user presses 'Q'
 
-            SDL_UpdateTexture(sdl_texture, NULL, screenbuffer, H_RES*sizeof(Pixel));
-            SDL_RenderClear(sdl_renderer);
-            SDL_RenderCopy(sdl_renderer, sdl_texture, NULL, NULL);
-            SDL_RenderPresent(sdl_renderer);
+            // Only update the SDL texture/present every `render_skip` frames
+            if (frame_count >= (uint64_t)warmup_frames) {
+                if ((frame_count % render_skip) == 0) {
+                    SDL_UpdateTexture(sdl_texture, NULL, screenbuffer, H_RES*sizeof(Pixel));
+                    SDL_RenderClear(sdl_renderer);
+                    SDL_RenderCopy(sdl_renderer, sdl_texture, NULL, NULL);
+                    SDL_RenderPresent(sdl_renderer);
+                }
+            }
             frame_count++;
         }
 
